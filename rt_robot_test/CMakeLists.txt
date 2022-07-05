@@ -145,9 +145,6 @@ add_library(examples_common STATIC
   examples_common.cpp
 )
 
-add_subdirectory(cpp_python_socket/cpp)
-include_directories(cpp_python_socket/cpp/include)
-
 
 ## Build options
 option(STRICT "Treat warnings as errors" OFF)
@@ -161,18 +158,7 @@ target_link_libraries(examples_common PUBLIC Franka::Franka Eigen3::Eigen3)
 
 # file to compile
 set(EXECUTABLE_FILES
-coppied_from_libfranka
-read_robot_state
-test_file
-pickplace_vel_cont
-cartesian_zero_impedance_control
-grip_force_test
-IROS2022
-IROS2022_data_collection
-IROS2022_controller
-Quintic_traj
-IROS2022_data_collection_quad
-#src/test.cpp
+slip_controller
 )
 
 # add the executable
