@@ -64,3 +64,10 @@ And for the **PSC** we need:
 
 **Grip Control Tests**
 
+To compare the proposed slip avoidance methods with the SOTA approaches, we use SMC gripper with real time grip position control for slip avoidance.
+
+<p align="left">
+  <img src="photos/grip_control.png" width="400" />
+  <img src="photos/gripgif.gif" width="280" />    
+  <center>Figure2. Grip control Setup</center>
+</p>
