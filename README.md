@@ -68,6 +68,6 @@ To compare the proposed slip avoidance methods with the SOTA approaches, we use 
 
 <p align="left">
   <img src="photos/grip_control.png" width="400" />
-  <img src="photos/gripgif.gif" width="280" />    
+  <img src="photos/gripgif.gif" width="250" />    
   <center>Figure2. Grip control Setup</center>
 </p>
