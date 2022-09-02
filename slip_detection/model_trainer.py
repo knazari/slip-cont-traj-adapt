@@ -19,75 +19,32 @@ seed = 42
 torch.manual_seed(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # use gpu if available
-torch.cuda.set_per_process_memory_fraction(fraction=0.8, device=None)
-torch.cuda.set_device(device)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # use gpu if available
 
-# This is the model used for CoRL paper
 class ClassifierLSTM(nn.Module):
-    
     def __init__(self, device, context_frames):
         super(ClassifierLSTM, self).__init__()
         self.device = device
         self.context_frames = context_frames
         self.lstm = nn.LSTM(32, 200).to(device)  # tactile
-        self.fc0 = nn.Linear(20, 48).to(device)
-        self.fcmid = nn.Linear(248, 124).to(device)
-        self.fc1 = nn.Linear(124, 40).to(device)
+        self.fc1 = nn.Linear(200, 40).to(device)
         self.fc2 = nn.Linear(40, 1).to(device)
-        self.tanh_activation = nn.Tanh().to(device)
+        self.tan_activation = nn.Tanh().to(device)
         self.relu_activation = nn.ReLU().to(device)
         self.softmax_activation = nn.Softmax(dim=1).to(device) #we don't use this because BCE loss in pytorch automatically applies the the Sigmoid activation
-        self.dropout = nn.Dropout(p=0.5).to(device)
-        self.norm_layer = nn.LayerNorm(124).to(device)
+        self.dropout = nn.Dropout(p=0.5)
 
-    def forward(self, tactiles, actions):
+    def forward(self, tactiles):
         batch_size__ = tactiles.shape[1]
         hidden = (torch.zeros(1, batch_size__, 200, device=torch.device('cuda')), torch.zeros(1, batch_size__, 200, device=torch.device('cuda')))
         lstm_out, self.hidden_lstm = self.lstm(tactiles, hidden)
-        out0 = self.fc0(actions)
-        tactile_and_action = torch.cat((lstm_out[-1], out0), 1)
-        fcmid_out = self.fcmid(tactile_and_action)
-        out1_drop = self.norm_layer(fcmid_out)
-        fc1_out = self.relu_activation(self.fc1(out1_drop))
+        lstm_out_drop = self.dropout(lstm_out[-1])
+        fc1_out = self.relu_activation(self.fc1(lstm_out_drop))
         fc1_out_drop = self.dropout(fc1_out)
-        fc2_out = self.tanh_activation(self.fc2(fc1_out_drop))
+        fc2_out = self.tan_activation(self.fc2(fc1_out_drop))
 
         return fc2_out
 
-# class ClassifierLSTM(nn.Module):
-    
-#     def __init__(self, device, context_frames):
-#         super(ClassifierLSTM, self).__init__()
-#         self.device = device
-#         self.context_frames = context_frames
-#         self.lstm_tactile = nn.LSTM(48, 200).to(device)  # tactile
-#         self.lstm_action = nn.LSTM(2, 50).to(device)  # tactile
-#         self.fc0 = nn.Linear(20, 48).to(device)
-#         self.fcmid = nn.Linear(200, 124).to(device)
-#         self.fc1 = nn.Linear(124, 40).to(device)
-#         self.fc2 = nn.Linear(40, 1).to(device)
-#         self.tanh_activation = nn.Tanh().to(device)
-#         self.relu_activation = nn.ReLU().to(device)
-#         self.softmax_activation = nn.Softmax(dim=1).to(device) #we don't use this because BCE loss in pytorch automatically applies the the Sigmoid activation
-#         self.dropout = nn.Dropout(p=0.5)
-#         self.norm_layer = nn.LayerNorm(124)
-
-#     def forward(self, tactiles, actions):
-#         batch_size__ = tactiles.shape[1]
-#         hidden_tactile = (torch.zeros(1, batch_size__, 200, device=torch.device('cuda')), torch.zeros(1, batch_size__, 200, device=torch.device('cuda')))
-#         hidden_action = (torch.zeros(1, batch_size__, 50, device=torch.device('cuda')), torch.zeros(1, batch_size__, 50, device=torch.device('cuda')))
-#         lstm_out_tactile, self.hidden_lstm_tactile = self.lstm_tactile(tactiles, hidden_tactile)
-#         # lstm_out_action, self.hidden_lstm_action = self.lstm_action(actions, hidden_action)
-#         # out0 = self.fc0(actions)
-#         # tactile_and_action = torch.cat((lstm_out_tactile[-1], lstm_out_action[-1]), 1)
-#         fcmid_out = self.fcmid(lstm_out_tactile[-1])
-#         out1_drop = self.norm_layer(fcmid_out)
-#         fc1_out = self.relu_activation(self.fc1(out1_drop))
-#         fc1_out_drop = self.dropout(fc1_out)
-#         fc2_out = self.tanh_activation(self.fc2(fc1_out_drop))
-
-#         return fc2_out
 
 class BatchGenerator:
     def __init__(self, train_percentage, train_data_dir, batch_size, image_size):
@@ -126,23 +83,22 @@ class FullDataSet:
 
     def __getitem__(self, idx):
         value = self.samples[idx]
-        robot_data = np.load(self.train_data_dir + value[0])
-        slip_label = np.load(self.train_data_dir + value[5])
-        failure_label = np.load(self.train_data_dir + value[6])
+        slip_label = np.load(self.train_data_dir + value[4])
+        failure_label = np.load(self.train_data_dir + value[5])
 
         if self.image_size == 0:
-            tactile_data = np.load(self.train_data_dir + value[1])
-            experiment_number = np.load(self.train_data_dir + value[2])
-            time_steps = np.load(self.train_data_dir + value[3])
+            tactile_data = np.load(self.train_data_dir + value[0])
+            experiment_number = np.load(self.train_data_dir + value[1])
+            time_steps = np.load(self.train_data_dir + value[2])
         else:
             tactile_data = []
-            for image_name in np.load(self.train_data_dir + value[1]):
+            for image_name in np.load(self.train_data_dir + value[2]):
                 tactile_data.append(np.load(self.train_data_dir + image_name))
             tactile_data = np.array(tactile_data)
             experiment_number = np.load(self.train_data_dir + value[3])
             time_steps = np.load(self.train_data_dir + value[4])
 
-        return [robot_data.astype(np.float32), tactile_data.astype(np.float32), experiment_number, time_steps, slip_label, failure_label]
+        return [tactile_data.astype(np.float32), experiment_number, time_steps, slip_label, failure_label]
 
 
 class UniversalModelTrainer:
@@ -169,15 +125,13 @@ class UniversalModelTrainer:
         if criterion == "L2":
             self.criterion = nn.MSELoss()
         if criterion == "BCEWithLogitsLoss":
-            weight = torch.Tensor([8]).to(device)
-            self.criterion = nn.BCEWithLogitsLoss(pos_weight=weight)
+            self.criterion = nn.BCEWithLogitsLoss()
 
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
     def train_full_model(self):
         best_training_loss = 100.0
         training_val_losses = []
-        training_val_acc = []
         progress_bar = tqdm(range(0, self.epochs))
         for epoch in progress_bar:
             model_save = ""
@@ -189,29 +143,27 @@ class UniversalModelTrainer:
             # trainging
             for index, batch_features in enumerate(self.train_full_loader):
                 self.optimizer.zero_grad()
-                # action = batch_features[0].permute(1, 0, 2).to(device)
-                action = torch.flatten(batch_features[0][:, :10, :], start_dim=1).to(device)
-                slip_label = batch_features[4].to(device)
-                failure_label = batch_features[5].to(device)
-                tactile = torch.flatten(batch_features[1], start_dim=2).permute(1, 0, 2)[:10, :, :32].to(device)
-                loss = self.run_batch(action, tactile, slip_label, train=True)            
+                slip_label = batch_features[3]
+                failure_label = batch_features[4]
+                slip_label = slip_label.to(device)
+                failure_label = failure_label.to(device)
+                tactile = torch.flatten(batch_features[0], start_dim=2).permute(1, 0, 2)[:, :, :32].to(device)
+                loss = self.run_batch(tactile, slip_label, train=True)            
                 train_max_index = index
 
             # validation
             for index, batch_features in enumerate(self.valid_full_loader):
                 self.optimizer.zero_grad()
-                # action = batch_features[0].permute(1, 0, 2).to(device)
-                action = torch.flatten(batch_features[0][:, :10, :], start_dim=1).to(device)
-                slip_label = batch_features[4].to(device)
-                failure_label = batch_features[5].to(device)
-                tactile = torch.flatten(batch_features[1], start_dim=2).permute(1, 0, 2)[:10, :, :32].to(device)
-                loss = self.run_batch(action, tactile, slip_label, validation=True)    
+                slip_label = batch_features[3]
+                failure_label = batch_features[4]
+                slip_label = slip_label.to(device)
+                failure_label = failure_label.to(device)
+                tactile = torch.flatten(batch_features[0], start_dim=2)[:, :, :32].permute(1, 0, 2).to(device)
+                loss = self.run_batch(tactile, slip_label, validation=True)    
                 val_max_index = index
 
             training_val_losses.append([self.train_loss/(train_max_index+1), self.val_loss/(val_max_index+1)])
-            training_val_acc.append([self.train_acc/(train_max_index+1), self.val_acc/(val_max_index+1)])
             np.save(self.model_save_path + "train_val_losses", np.array(training_val_losses))
-            np.save(self.model_save_path + "train_val_accuracy", np.array(training_val_acc))
 
             # early stopping and saving:
             if best_training_loss > self.val_loss/(val_max_index+1):
@@ -221,9 +173,8 @@ class UniversalModelTrainer:
 
             print("Training mean loss: {:.4f} || Validation mean loss: {:.4f} || Training mean Acc: {:.4f} || Validation mean Acc: {:.4f} || {}".format(self.train_loss/(train_max_index+1), self.val_loss/(val_max_index+1), self.train_acc/(train_max_index+1), self.val_acc/(val_max_index+1), model_save))
 
-    def run_batch(self, action, tactile, slip_label, train=False, validation=False):
-        # print(self.model.device)
-        slip_predictions = self.model.forward(tactiles=tactile, actions=action)  # Step 3. Run our forward pass.
+    def run_batch(self, tactile, slip_label, train=False, validation=False):
+        slip_predictions = self.model.forward(tactiles=tactile)  # Step 3. Run our forward pass.
         loss = self.criterion(slip_predictions, slip_label.unsqueeze(1))
         acc = self.binary_acc(slip_predictions, slip_label.unsqueeze(1))
 
@@ -248,8 +199,8 @@ class UniversalModelTrainer:
         return acc
 
 def main():
-    model_save_path = "/home/kia/Kiyanoush/UoLincoln/Projects/Tactile_control/Humanoids/saved_models/test_slip_prediction/"
-    train_data_dir = "/home/kia/Kiyanoush/UoLincoln/Projects/Tactile_control/data_set/train_image_dataset_10c_10h/"
+    model_save_path = "/home/kia/Kiyanoush/UoLincoln/Projects/Tactile_control/Baseline/saved_models/"
+    train_data_dir = "/home/kia/Kiyanoush/UoLincoln/Projects/Tactile_control/data_set/train_image_dataset_10c_00h/"
 
     # unique save title:
     model_save_path = model_save_path + "model_" + datetime.now().strftime("%d_%m_%Y_%H_%M/")
@@ -259,12 +210,12 @@ def main():
     batch_size = 32
     learning_rate = 1e-3
     context_frames = 10
-    sequence_length = 25
+    sequence_length = 10
     train_percentage = 0.9
     validation_percentage = 0.1
     image_size = 0  # set to zero if linear data
     criterion = "BCEWithLogitsLoss"
-    model_name = "Humanoids_AC_LSTM"
+    model_name = "Baseline_LSTM"
     model = ClassifierLSTM(device=device, context_frames=context_frames)
     model.to(device)
 

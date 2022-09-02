@@ -20,15 +20,12 @@ dataset_path = "/home/kia/Kiyanoush/UoLincoln/Projects/Tactile_control/data_set/
 # Hyper-parameters:
 train_data_dir = dataset_path + 'train/'
 test_data_dir  = dataset_path + 'test/'
-train_out_dir  = dataset_path + 'train_image_dataset_10c_10h/'
-test_out_dir   = dataset_path + 'test_image_dataset_10c_10h/'
-scaler_out_dir = dataset_path + 'scalars/'
+train_out_dir  = dataset_path + 'train_image_dataset_10c_T10/'
+test_out_dir   = dataset_path + 'test_image_dataset_10c_T10/'
+scaler_out_dir = dataset_path + 'scalars_10c_T10/'
 
 smooth = False
 filter_kalman = True
-image = False
-image_height = 64
-image_width = 64
 context_length = 10
 horrizon_length = 10
 
@@ -41,9 +38,6 @@ class data_formatter:
         self.full_data_robot = []
         self.smooth = smooth
         self.filter_kalman = filter_kalman
-        self.image = image
-        self.image_height = image_height
-        self.image_width = image_width
         self.context_length = context_length
         self.horrizon_length = horrizon_length
 
@@ -66,23 +60,16 @@ class data_formatter:
                 else:
                     path_save = stage
 
-                tactile, robot, meta = self.load_file_data(file)
+                tactile, robot, meta, slip, failure = self.load_file_data(file)
 
                 # scale the data
                 for index, (standard_scaler, min_max_scalar) in enumerate(zip(self.tactile_standard_scaler, self.tactile_min_max_scalar)):
                     tactile[:, index] = standard_scaler.transform(tactile[:, index])
                     tactile[:, index] = min_max_scalar.transform(tactile[:, index])
-
+                
                 for index, min_max_scalar in enumerate(self.robot_min_max_scalar):
                     robot[:, index] = np.squeeze(min_max_scalar.transform(robot[:, index].reshape(-1, 1)))
-
-                tactile_image_names = []
-                if self.image:
-                    for time_step in range(len(tactile)):
-                        current_image = self.create_image(tactile[time_step][0], tactile[time_step][1], tactile[time_step][2])
-                        image_name = "tactile_image_" + str(experiment_number) + "_time_step_" + str(time_step) + ".npy"
-                        tactile_image_names.append(image_name)
-                        np.save(path_save + image_name, current_image)
+                
 
                 sequence_length = self.context_length + self.horrizon_length
                 for time_step in range(len(tactile) - sequence_length):
@@ -90,25 +77,25 @@ class data_formatter:
                     tactile_data_sequence     = [tactile[time_step + t] for t in range(sequence_length)]
                     experiment_data_sequence  = experiment_number
                     time_step_data_sequence   = [time_step + t for t in range(sequence_length)]
-                    if self.image:
-                        tactile_image_name_sequence = [tactile_image_names[time_step + t] for t in range(sequence_length)]
-
+                    slip_label_sequence = slip[time_step + sequence_length - 1]
+                    failure_label_sequence = failure[time_step + sequence_length - 1]
+                  
                     ###################################### Save the data and add to the map ###########################################
                     np.save(path_save + 'robot_data_' + str(index_to_save), robot_data_sequence)
                     np.save(path_save + 'tactile_data_sequence_' + str(index_to_save), tactile_data_sequence)
-                    if self.image:
-                        np.save(path_save + 'tactile_image_name_sequence_' + str(index_to_save), tactile_image_name_sequence)
                     np.save(path_save + 'experiment_number_' + str(index_to_save), experiment_data_sequence)
                     np.save(path_save + 'time_step_data_' + str(index_to_save), time_step_data_sequence)
                     np.save(path_save + 'trial_meta_' + str(index_to_save), np.array(meta))
+                    np.save(path_save + 'slip_data_' + str(index_to_save), np.array(slip_label_sequence))
+                    np.save(path_save + 'failure_data_' + str(index_to_save), np.array(failure_label_sequence))
                     ref = []
                     ref.append('robot_data_' + str(index_to_save) + '.npy')
                     ref.append('tactile_data_sequence_' + str(index_to_save) + '.npy')
-                    if self.image:
-                        ref.append('tactile_image_name_sequence_' + str(index_to_save) + '.npy')
                     ref.append('experiment_number_' + str(index_to_save) + '.npy')
                     ref.append('time_step_data_' + str(index_to_save) + '.npy')
                     ref.append('trial_meta_' + str(index_to_save) + '.npy')
+                    ref.append('slip_data_' + str(index_to_save) + '.npy')
+                    ref.append('failure_data_' + str(index_to_save) + '.npy')
                     self.path_file.append(ref)
                     index_to_save += 1
 
@@ -122,25 +109,25 @@ class data_formatter:
         if test:
             with open(path + '/map_' + str(self.test_no) + '.csv', 'w') as csvfile:
                 writer = csv.writer(csvfile, quoting=csv.QUOTE_ALL)
-                writer.writerow(['robot_data_path', 'tactile_data_sequence', 'experiment_number', 'time_steps', 'meta'])
+                writer.writerow(['robot_data_path', 'tactile_data_sequence', 'experiment_number', 'time_steps', 'meta', 'slip', 'failure'])
                 for row in self.path_file:
                     writer.writerow(row)
         else:
             with open(path + '/map.csv', 'w') as csvfile:
                 writer = csv.writer(csvfile, quoting=csv.QUOTE_ALL)
-                writer.writerow(['robot_data_path', 'tactile_data_sequence', 'experiment_number', 'time_steps', 'meta'])
+                writer.writerow(['robot_data_path', 'tactile_data_sequence', 'experiment_number', 'time_steps', 'meta', 'slip', 'failure'])
                 for row in self.path_file:
                     writer.writerow(row)
 
     def scale_data(self):
         files = self.files_train + self.files_test
         for file in tqdm(files):
-            tactile, robot, _ = self.load_file_data(file)
+            tactile, robot, _, _, _ = self.load_file_data(file)
             self.full_data_tactile += list(tactile)
             self.full_data_robot += list(robot)
 
-        self.full_data_robot = np.array(self.full_data_robot)
         self.full_data_tactile = np.array(self.full_data_tactile)
+        self.full_data_robot = np.array(self.full_data_robot)
 
         self.robot_min_max_scalar = [preprocessing.MinMaxScaler(feature_range=(0, 1)).fit(self.full_data_robot[:, feature].reshape(-1, 1)) for feature in range(2)]
         self.tactile_standard_scaler = [preprocessing.StandardScaler().fit(self.full_data_tactile[:, feature]) for feature in range(3)]
@@ -152,6 +139,9 @@ class data_formatter:
         robot_state = np.array(pd.read_csv(file + '/robot_state.csv', header=None))
         meta_data = np.array(pd.read_csv(file + '/meta_data.csv', header=None))
         xela_sensor = pd.read_csv(file + '/xela_sensor1.csv')
+        slip_label = pd.read_csv(file + '/slip_label.csv')['slip']
+        fail_label = pd.read_csv(file + '/slip_label.csv')['fail']
+
         xela_sensor = np.array(xela_sensor.sub(xela_sensor.loc[0]))
 
         robot_task_space = np.array([[state[-3], state[-2]] for state in robot_state[1:]]).astype(float)
@@ -168,28 +158,12 @@ class data_formatter:
                     kf = KalmanFilter(initial_state_mean=tactile_data[0, i, :], n_dim_obs=16, initial_state_covariance=1*np.eye(16), observation_covariance=8*np.eye(16))
                     tactile_data[:, i, :], _ = kf.filter(tactile_data[:, i, :])
         
-        if self.smooth:
-            tactile_data = self.smooth_the_trial(np.array(tactile_data))
-            tactile_data = tactile_data[3:-3, :, :]
-            robot_task_space = robot_task_space[3:-3, :]
 
-        return tactile_data, robot_task_space, meta_data
+        return tactile_data, robot_task_space, meta_data, slip_label, fail_label
 
     def load_file_names(self):
         self.files_train = glob.glob(train_data_dir + '/*')
         self.files_test = glob.glob(test_data_dir + '/*')
-
-    def smooth_the_trial(self, tactile_data):
-        for force in range(tactile_data.shape[1]):
-            for taxel in range(tactile_data.shape[2]):
-                tactile_data[:, force, taxel] = [None for i in range(3)] + list(self.smooth_func(tactile_data[:, force, taxel], 6)[3:-3]) + [None for i in range(3)]
-
-        return tactile_data
-
-    def smooth_func(self, y, box_pts):
-        box = np.ones(box_pts)/box_pts
-        y_smooth = np.convolve(y, box, mode='same')
-        return y_smooth
 
     def save_scalars(self):
         # save the scalars
@@ -200,19 +174,9 @@ class data_formatter:
         dump(self.tactile_min_max_scalar[1], open(scaler_out_dir + 'tactile_min_max_scalar_y.pkl', 'wb'))
         dump(self.tactile_min_max_scalar[2], open(scaler_out_dir + 'tactile_min_max_scalar_z.pkl', 'wb'))
 
+
         dump(self.robot_min_max_scalar[0], open(scaler_out_dir + 'robot_min_max_scalar_vx.pkl', 'wb'))
         dump(self.robot_min_max_scalar[1], open(scaler_out_dir + 'robot_min_max_scalar_vy.pkl', 'wb'))
-
-    def create_image(self, tactile_x, tactile_y, tactile_z):
-        # convert tactile data into an image:
-        image = np.zeros((4, 4, 3), np.float32)
-        index = 0
-        for x in range(4):
-            for y in range(4):
-                image[x][y] = [tactile_x[index], tactile_y[index], tactile_z[index]]
-                index += 1
-        reshaped_image = np.rot90(cv2.resize(image.astype(np.float32), dsize=(self.image_height, self.image_width), interpolation=cv2.INTER_CUBIC), k=1, axes=(0, 1))
-        return reshaped_image
 
 
 def main():

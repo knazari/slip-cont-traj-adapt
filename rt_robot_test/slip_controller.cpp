@@ -25,13 +25,10 @@
  * Trapezodal velocity profiles in cartesian space for post grasp motion with various V_max values.
  */
 
-// To run the resulted executable in the build directory after "make" you need > ./vel_controller 192.16.0.2
-
 float slip_value;
 void slipCallback(const std_msgs::Float64& slip)
 {
   slip_value = slip.data;
-  // slip_value = 0; // added this to avoid activating control now!
 }
 
 float optimal_v_x = 0;
@@ -125,17 +122,6 @@ int main(int argc, char** argv) {
 
     // Set the joint impedance.
     robot.setJointImpedance({{3000, 3000, 3000, 2500, 2500, 2000, 2000}});
-    // set collision behavior
-    // robot.setCollisionBehavior({{1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0}},
-    //                            {{1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0}},
-    //                            {{1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0}},
-    //                            {{1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0}});
-
-    // robot.setCollisionBehavior(
-    //     {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}}, {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}},
-    //     {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}}, {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}},
-    //     {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}}, {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}},
-    //     {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}}, {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}});
 
     // Create a vector of vectors which is a 2D matrix to push_back robot state data into.
     // To learn more about "The C++ Standard Template Library (STL)" refer to https://www.geeksforgeeks.org/the-c-standard-template-library-stl/
@@ -203,9 +189,7 @@ int main(int argc, char** argv) {
       if (slip_value == 1){
         slip_flag_new = true;
       }
-      // if (time > 1.3){
-      //   slip_flag_new = true;
-      // }
+     
       if (slip_flag_new != slip_flag_old){
         slip_onset_time = time;
         slip_onset_v_x = v_x;
@@ -271,16 +255,6 @@ int main(int argc, char** argv) {
         if (optimal_v_x != 0){
           v_x = v_x + (optimal_v_x - v_x)/200;
           v_y = v_y + (optimal_v_y - v_y)/200; 
-          // if (abs(optimal_v_x - v_x) > 0.01){
-          //   v_x = v_x + (optimal_v_x - v_x)/40;
-          //   v_y = v_y + (optimal_v_y - v_y)/40;
-          // std::cout << "optimal control: " << v_x << std::endl;
-          // } 
-          // else{
-          //   v_x = optimal_v_x;
-          //   v_y = optimal_v_y;
-          //   std::cout << "in else" << std::endl;
-          // }
         } 
        
       }
@@ -316,15 +290,6 @@ int main(int argc, char** argv) {
         v_x = -0.03;
         v_y = (translation_y/translation_x) * (-0.03);
       }
-      // std::cout << "final v_x: " << v_x << std::endl;
-      
-      // // This was to test that if we can move the gripper in a real time loop and we saw that it fails and robots stops by "communication_constraints_violation" error
-      // // std::cout << v_x << std::endl;
-      // if (v_x < -0.30000 && v_x > -0.300800)
-      // {
-      //   gripper.move(0.07, 0.5);
-      //   std::cout << "Hiiiii" << std::endl;
-      // }
       
       franka::CartesianVelocities output = {{v_x, v_y, 0, 0, 0, 0}}; //Desired Cartesian velocity w.r.t. O-frame (base) {dx, dy, dz in [m/s], omegax, omegay, omegaz in [rad/s]
      
