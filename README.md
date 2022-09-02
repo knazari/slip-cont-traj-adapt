@@ -32,6 +32,35 @@ Now that we have the (i) trained torch models and (ii) saved scalars for preproc
 
 **Online slip control**
 
+We use ROS noetic for real-time test cases. To be able to use *libfranka* in you ROS package you need to add it to CMakeLists.txt of your package as follows:
+
+        find_package(Franka 0.8.0 EXACT REQUIRED PATHS /libfranka/build NO_DEFAULT_PATH)
+
+        add_library(examples_common STATIC
+        examples_common.cpp
+        )
+
+To decrease the inference time of the pyTorch models we use ONNX library. You can use rt_robot_test/ONNX_torch/torch2onnx.py to convert trained torch models to onnx files. Use this [page](https://pytorch.org/tutorials/advanced/super_resolution_with_onnxruntime.html) as reference.
+
+To bring up the hardware we need to first run *xela_server* for uSkin sensot:
+
+        ./rt_robot_test/XELA/u20/xela_server
+
+And then use this launch file to publish synchronized tactiel sensor, realsense, and ArUco marker data under one topic:
+
+        roslaunch rt_robot_test/launch/slip_control.launch
+
+Now we can run the **RSC** and **PSC** models! For each test we have slip detection/prediction + optimization script (.py) and Cartesian velocity control script (.cpp) to run together. For RSC we need:
+
+        rosrun rt_robot_test/python scripts/CoRL/RSC.py
+        rosrun rt_robot_test/slip_controller.cpp robot_ip
+
+And for the **PSC** we need:
+
+        rosrun rt_robot_test/python scripts/CoRL/PSC.py
+        rosrun rt_robot_test/slip_controller.cpp robot_ip
 
 
-Edit the data set and output folder directories in the script. We use two slip classification models. One is a slip detection model which uses a history of tactile data to predicit the slip binary state at current time step. The second model is an action-conditioned modek which use tatctile hisory alongside future robot trajectory for slip prediction. The training scripts for these models are in /slip_detection and \AC_slip_prediction directories respectively. 
+
+**Grip Control Tests**
+
